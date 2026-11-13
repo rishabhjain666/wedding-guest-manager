@@ -63,28 +63,72 @@ create table public.activity_logs (
 );
 
 -- Prevent cross-wedding foreign-key references and cyclic family trees.
-create or replace function public.validate_wedding_links() returns trigger language plpgsql security definer set search_path=public as $$
-declare linked_wedding uuid; cycle_found boolean;
+create or replace function public.validate_wedding_links() returns trigger
+language plpgsql security definer set search_path=public as $$
+declare
+  linked_wedding uuid;
+  cycle_found boolean;
 begin
- if tg_table_name='family_groups' and new.parent_id is not null then
-  select wedding_id into linked_wedding from public.family_groups where id=new.parent_id;
-  if linked_wedding is distinct from new.wedding_id then raise exception 'Parent family group must belong to the same wedding'; end if;
-  with recursive ancestors(id,parent_id) as (select id,parent_id from public.family_groups where id=new.parent_id union all select f.id,f.parent_id from public.family_groups f join ancestors a on f.id=a.parent_id)
-  select exists(select 1 from ancestors where id=new.id) into cycle_found;
-  if cycle_found then raise exception 'Family hierarchy cannot contain a cycle'; end if;
- elsif tg_table_name='guests' and new.family_group_id is not null then
-  select wedding_id into linked_wedding from public.family_groups where id=new.family_group_id;
-  if linked_wedding is distinct from new.wedding_id then raise exception 'Family group must belong to the same wedding'; end if;
- elsif tg_table_name='floors' then
-  select wedding_id into linked_wedding from public.hotels where id=new.hotel_id;
-  if linked_wedding is distinct from new.wedding_id then raise exception 'Hotel must belong to the same wedding'; end if;
- elsif tg_table_name='rooms' then
-  select wedding_id into linked_wedding from public.hotels where id=new.hotel_id;
-  if linked_wedding is distinct from new.wedding_id then raise exception 'Hotel must belong to the same wedding'; end if;
-  if new.floor_id is not null and not exists(select 1 from public.floors where id=new.floor_id and hotel_id=new.hotel_id and wedding_id=new.wedding_id) then raise exception 'Floor must belong to the selected hotel and wedding'; end if;
- end if;
- return new;
-end $$;
+  -- Keep NEW field references inside table-specific branches. PostgreSQL trigger
+  -- records have different fields for each table.
+  if tg_table_name = 'family_groups' then
+    if new.parent_id is not null then
+      select wedding_id into linked_wedding
+      from public.family_groups where id = new.parent_id;
+      if linked_wedding is distinct from new.wedding_id then
+        raise exception 'Parent family group must belong to the same wedding';
+      end if;
+
+      with recursive ancestors(id, parent_id) as (
+        select id, parent_id from public.family_groups where id = new.parent_id
+        union all
+        select f.id, f.parent_id
+        from public.family_groups f join ancestors a on f.id = a.parent_id
+      )
+      select exists(select 1 from ancestors where id = new.id)
+      into cycle_found;
+
+      if cycle_found then
+        raise exception 'Family hierarchy cannot contain a cycle';
+      end if;
+    end if;
+
+  elsif tg_table_name = 'guests' then
+    if new.family_group_id is not null then
+      select wedding_id into linked_wedding
+      from public.family_groups where id = new.family_group_id;
+      if linked_wedding is distinct from new.wedding_id then
+        raise exception 'Family group must belong to the same wedding';
+      end if;
+    end if;
+
+  elsif tg_table_name = 'floors' then
+    select wedding_id into linked_wedding
+    from public.hotels where id = new.hotel_id;
+    if linked_wedding is distinct from new.wedding_id then
+      raise exception 'Hotel must belong to the same wedding';
+    end if;
+
+  elsif tg_table_name = 'rooms' then
+    select wedding_id into linked_wedding
+    from public.hotels where id = new.hotel_id;
+    if linked_wedding is distinct from new.wedding_id then
+      raise exception 'Hotel must belong to the same wedding';
+    end if;
+
+    if new.floor_id is not null and not exists (
+      select 1 from public.floors
+      where id = new.floor_id and hotel_id = new.hotel_id
+        and wedding_id = new.wedding_id
+    ) then
+      raise exception 'Floor must belong to the selected hotel and wedding';
+    end if;
+  end if;
+
+  return new;
+end
+$$;
+
 create trigger family_group_tenant_guard before insert or update on public.family_groups for each row execute function public.validate_wedding_links();
 create trigger guest_tenant_guard before insert or update on public.guests for each row execute function public.validate_wedding_links();
 create trigger floor_tenant_guard before insert or update on public.floors for each row execute function public.validate_wedding_links();
