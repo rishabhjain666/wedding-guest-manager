@@ -178,9 +178,9 @@ begin
  if not public.can_manage() then raise exception 'Not authorized'; end if;
  select wedding_id into wid from public.guests where id=p_guest_id and wedding_id=public.current_wedding_id();
  if wid is null then raise exception 'Guest not found'; end if;
- raw_token=encode(gen_random_bytes(32),'hex');
+ raw_token=encode(extensions.gen_random_bytes(32),'hex');
  insert into public.lookup_tokens(wedding_id,guest_id,token_hash,expires_at,created_by)
- values(wid,p_guest_id,encode(digest(raw_token,'sha256'),'hex'),p_expires_at,auth.uid());
+ values(wid,p_guest_id,encode(extensions.digest(raw_token,'sha256'),'hex'),p_expires_at,auth.uid());
  return raw_token;
 end $$;
 create or replace function public.lookup_guest(p_token text)
@@ -192,7 +192,7 @@ begin
  from public.room_allocations a join public.rooms r on r.id=a.room_id join public.hotels h on h.id=r.hotel_id left join public.floors f on f.id=r.floor_id
  where a.guest_id=g.id), '[]'::jsonb)) into result
  from public.lookup_tokens t join public.guests g on g.id=t.guest_id left join public.family_groups fg on fg.id=g.family_group_id
- where t.token_hash=encode(digest(p_token,'sha256'),'hex') and t.revoked_at is null and (t.expires_at is null or t.expires_at>now());
+ where t.token_hash=encode(extensions.digest(p_token,'sha256'),'hex') and t.revoked_at is null and (t.expires_at is null or t.expires_at>now());
  return result;
 end $$;
 
