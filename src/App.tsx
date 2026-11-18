@@ -92,13 +92,13 @@ function GuestQRScanner(){
  const [busy,setBusy]=useState(false);
  const [error,setError]=useState('');
  const [guestData,setGuestData]=useState<any>(null);
- const [scanSource,setScanSource]=useState('');
+
  async function lookup(value:string){
   const raw=value.trim();if(!raw){setError('Scan a guest QR code or enter its private lookup link.');return}
   let token=raw;
   try{const parsed=new URL(raw,window.location.origin);const marker='/lookup/';const index=parsed.pathname.indexOf(marker);if(index>=0)token=decodeURIComponent(parsed.pathname.slice(index+marker.length).split('/')[0]);}catch{}
   if(!token||token.includes('/')||token.includes('?')||token.includes('#')){setError('Invalid guest QR link or token.');return}
-  setBusy(true);setError('');setGuestData(null);setScanSource(raw);
+  setBusy(true);setError('');setGuestData(null);
   try{const {data,error:lookupError}=await supabase!.rpc('lookup_guest',{p_token:token});if(lookupError)throw lookupError;if(!data)throw new Error('This guest pass is invalid, expired or revoked.');setGuestData(data)}
   catch(e){setError(e instanceof Error?e.message:'Unable to verify this guest pass.')}
   finally{setBusy(false);setCameraActive(false)}
