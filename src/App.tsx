@@ -156,7 +156,7 @@ function ReportsPage(){
  const dateStamp=new Date().toISOString().slice(0,10);
  const safeName=(value:string)=>value.normalize('NFKD').replace(/[^a-zA-Z0-9-]+/g,'-').replace(/^-+|-+$/g,'').toLowerCase()||'wedding';
  const filename=safeName('wedding-'+(d.wedding?.starts_on||dateStamp)+'-report');
- const exportPdf=(title:string,head:string[],body:string[][],landscape=false)=>{
+ const exportPdf=(title:string,head:string[],body:(string|number)[][],landscape=false)=>{
   try{
    if(!body.length){setNotice('There are no records to export for this report.');return}
    const pdf=new jsPDF({orientation:landscape?'landscape':'portrait',unit:'mm',format:'a4'});
@@ -168,7 +168,7 @@ function ReportsPage(){
    pdf.save(filename+'-'+safeName(title)+'.pdf');setNotice(title+' PDF downloaded.');
   }catch(e){setNotice(e instanceof Error?'PDF export failed: '+e.message:'PDF export failed.')}
  };
- const exportCsvReport=(name:string,head:string[],body:string[][])=>{
+ const exportCsvReport=(name:string,head:string[],body:(string|number)[][])=>{
   try{if(!body.length){setNotice('There are no records to export for this report.');return}downloadCsv(filename+'-'+name+'.csv',[head,...body]);setNotice(name+' CSV downloaded. Open it in Excel.')}catch(e){setNotice(e instanceof Error?'CSV export failed: '+e.message:'CSV export failed.')}
  };
  const guestRows=d.guests.map(g=>[g.name,d.groups.find(x=>x.id===g.family_group_id)?.name||'',g.phone||'',g.age_category,g.gender||'',g.persons_count,g.arrival_date||'',g.departure_date||'',g.special_notes||'']);
