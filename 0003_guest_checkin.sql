@@ -45,7 +45,7 @@ begin
     raise exception 'Person count must be at least one';
   end if;
 
-  if p_action not in ('check_in', 'check_out') then
+  if p_action is null or p_action not in ('check_in', 'check_out') then
     raise exception 'Unsupported check-in action';
   end if;
 
